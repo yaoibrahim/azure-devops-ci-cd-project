@@ -1,11 +1,11 @@
 const express = require('express');
-const mysql = require('mysql2/promise'); // Utilisation des promesses pour async/await
-require('dotenv').config(); // Pour lire le fichier .env
+const mysql = require('mysql2/promise');
+require('dotenv').config();
 
 const app = express();
 const port = 3000;
 
-// Configuration de la connexion
+// Configuration de la connexion utilisant les variables d'environnement
 const dbConfig = {
   host: process.env.DB_SERVER,
   user: process.env.DB_USER,
@@ -13,28 +13,44 @@ const dbConfig = {
   database: process.env.DB_NAME,
   port: 3306,
   ssl: {
-    rejectUnauthorized: false // Requis pour les connexions Azure MySQL
-  }
+    rejectUnauthorized: false // Indispensable pour Azure Database for MySQL
+  },
+  connectTimeout: 10000 // 10 secondes de timeout pour éviter les blocages infinis
 };
 
 app.get('/', async (req, res) => {
+  let connection;
   try {
-    const connection = await mysql.createConnection(dbConfig);
+    // Debug : affiche les infos de connexion dans les logs (utile pour Docker logs)
+    console.log(`Tentative de connexion à : ${process.env.DB_SERVER} avec l'utilisateur : ${process.env.DB_USER}`);
+
+    connection = await mysql.createConnection(dbConfig);
     
-    // Insertion d'un log à chaque visite
-    await connection.execute('INSERT INTO logs (message) VALUES (?)', ['Visite via l\'application']);
+    // 1. Insertion d'un log (Assure-toi que la table 'logs' existe via ton script migrations.sql)
+    await connection.execute('INSERT INTO logs (message) VALUES (?)', [`Visite enregistrée le ${new Date().toISOString()}`]);
     
-    // Récupération de la date du serveur
+    // 2. Récupération de la date du serveur MySQL
     const [rows] = await connection.execute('SELECT NOW() AS date');
     
-    await connection.end();
-    res.send(`🚀 Application Azure DevOps en ligne - Date MySQL : ${rows[0].date}`);
+    res.send(`
+      <h1>🚀 Application Azure DevOps en ligne</h1>
+      <p><strong>Statut :</strong> Connecté à Azure MySQL</p>
+      <p><strong>Date du serveur SQL :</strong> ${rows[0].date}</p>
+    `);
+
   } catch (err) {
-    console.error(err);
-    res.status(500).send('❌ Erreur de connexion à la base MySQL : ' + err.message);
+    console.error('Détail de l\'erreur :', err);
+    res.status(500).send(`
+      <h1>❌ Erreur de connexion</h1>
+      <p>L'application n'a pas pu joindre la base de données.</p>
+      <pre>${err.message}</pre>
+    `);
+  } finally {
+    if (connection) await connection.end(); // Fermeture propre de la connexion
   }
 });
 
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`Application lancée sur http://localhost:${port}`);
+  console.log(`Serveur cible : ${process.env.DB_SERVER}`);
 });
