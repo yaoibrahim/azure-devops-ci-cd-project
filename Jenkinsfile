@@ -1,20 +1,27 @@
 pipeline {
     agent any
-    
+
     environment {
         // Informations du serveur SQL
         DB_SERVER = 'srv-webapp.mysql.database.azure.com'
         DB_USER   = 'adminsql'
         DB_NAME   = 'webappdb'
-        // On récupère le mot de passe stocké de manière sécurisée dans Jenkins
+        
+        // IMPORTANT : 'AZURE_SQL_PASSWORD' est l'ID que tu as saisi dans Jenkins (Secret Text)
         DB_PASSWORD = credentials('AZURE_SQL_PASSWORD') 
-        IMAGE_NAME = "webapp-image"
+        
+        // Informations Azure
+        ACR_URL = "acrwebappdevops.azurecr.io"
+        IMAGE_NAME = "webapp"
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+        AKS_NAME = "aks-webapp-devops"
+        RESOURCE_GROUP = "vm-devops"
     }
 
     stages {
         stage('Checkout') {
             steps {
-                // Récupère ton code depuis GitHub
+                // Récupération automatique depuis ton repo public
                 checkout scm
             }
         }
@@ -22,32 +29,37 @@ pipeline {
         stage('Database Migration') {
             steps {
                 script {
-                    echo "Application des migrations SQL..."
-                    // Jenkins utilise un client MySQL pour créer la table si elle n'existe pas
-                    sh "mysql -h ${DB_SERVER} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} < database/migrations.sql"
+                    echo "Application des migrations SQL sur Azure..."
+                    // Utilisation de guillemets simples pour protéger le mot de passe
+                    sh "mysql -h ${DB_SERVER} -u ${DB_USER} -p'${DB_PASSWORD}' ${DB_NAME} < database/migrations.sql"
                 }
             }
         }
 
-        stage('Build Docker') {
+        stage('Docker Build & Push') {
             steps {
-                echo "Construction de l'image Docker..."
-                sh "docker build -t ${IMAGE_NAME}:latest -f docker/Dockerfile ."
+                script {
+                    // Connexion à l'ACR avec l'ID d'identifiant créé précédemment
+                    docker.withRegistry("https://${ACR_URL}", 'acr_credentials') {
+                        def customImage = docker.build("${ACR_URL}/${IMAGE_NAME}:${IMAGE_TAG}", "-f docker/Dockerfile .")
+                        customImage.push()
+                        customImage.push("latest")
+                    }
+                }
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy to AKS') {
             steps {
-                echo "Déploiement du conteneur..."
-                sh "docker stop webapp-azure || true"
-                sh "docker rm webapp-azure || true"
                 sh """
-                    docker run -d -p 3000:3000 --name webapp-azure \
-                    --env DB_USER='${DB_USER}' \
-                    --env DB_PASSWORD='${DB_PASSWORD}' \
-                    --env DB_SERVER='${DB_SERVER}' \
-                    --env DB_NAME='${DB_NAME}' \
-                    ${IMAGE_NAME}:latest
+                # Récupération du fichier kubeconfig pour AKS
+                az aks get-credentials --resource-group ${RESOURCE_GROUP} --name ${AKS_NAME} --overwrite-existing
+                
+                # Mise à jour de l'image du conteneur dans Kubernetes
+                kubectl set image deployment/webapp-deployment node-app=${ACR_URL}/${IMAGE_NAME}:${IMAGE_TAG}
+                
+                # Attente que le déploiement soit terminé et opérationnel
+                kubectl rollout status deployment/webapp-deployment
                 """
             }
         }
