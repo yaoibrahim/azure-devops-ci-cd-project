@@ -5,26 +5,73 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Azure CI/CD Pipeline</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; max-width: 500px; width: 90%; }
-        .status-badge { background: #28a745; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.9rem; }
-        h1 { color: #0078d4; margin-bottom: 0.5rem; }
-        p { color: #666; }
-        .footer { margin-top: 2rem; font-size: 0.8rem; color: #999; border-top: 1px solid #eee; pt: 1rem; }
-        .btn { background: #0078d4; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; text-decoration: none; }
-        .btn:hover { background: #005a9e; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #f0f2f5; 
+            margin: 0; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+        }
+        .card { 
+            background: white; 
+            padding: 2rem; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1); 
+            text-align: center; 
+            max-width: 500px; 
+            width: 90%; 
+        }
+        .status-badge { 
+            background: #28a745; 
+            color: white; 
+            padding: 5px 12px; 
+            border-radius: 20px; 
+            font-size: 0.9rem; 
+            font-weight: bold;
+        }
+        h1 { 
+            color: #0078d4; 
+            margin-bottom: 0.5rem; 
+        }
+        p { 
+            color: #666; 
+            line-height: 1.6;
+        }
+        hr {
+            border: 0;
+            border-top: 1px solid #eee;
+            margin: 1.5rem 0;
+        }
+        .footer { 
+            margin-top: 2rem; 
+            font-size: 0.8rem; 
+            color: #999; 
+            padding-top: 1rem;
+        }
+        .highlight {
+            color: #0078d4;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div class="card">
         <h1>🚀 Pipeline Automatique</h1>
-        <p><span class="status-badge">Statut : Connecté à AKS</span></p>
+        <p><span class="status-badge">Statut : Déploiement Réussi</span></p>
         <hr>
-        <p>Cette mise à jour a été déployée <strong>automatiquement</strong> via GitHub Webhook et Jenkins !</p>
+        <p>Félicitations ! Cette page a été mise à jour via <span class="highlight">GitHub Webhook</span>.</p>
+        <p>Le code a été poussé depuis ton PC, buildé par <strong>Jenkins</strong>, et déployé sur <strong>Azure Kubernetes Service (AKS)</strong> sans aucune intervention manuelle.</p>
         <div class="footer">
-            <p>Propulsé par Azure Kubernetes Service & Jenkins</p>
-            <p>ID du Build : #8 (ou plus)</p>
+            <p>Infrastructure : AKS | CI/CD : Jenkins & GitHub</p>
+            <p>Build généré le : <span id="date"></span></p>
         </div>
     </div>
+
+    <script>
+        // Affiche la date actuelle pour prouver le rafraîchissement
+        document.getElementById('date').innerText = new Date().toLocaleString();
+    </script>
 </body>
 </html>
