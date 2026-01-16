@@ -7,10 +7,10 @@ pipeline {
         DB_USER   = 'adminsql'
         DB_NAME   = 'webappdb'
         
-        // IMPORTANT : 'AZURE_SQL_PASSWORD' est l'ID que tu as saisi dans Jenkins (Secret Text)
+        // Mot de passe SQL stocké dans Jenkins (Credentials ID: AZURE_SQL_PASSWORD)
         DB_PASSWORD = credentials('AZURE_SQL_PASSWORD') 
         
-        // Informations Azure
+        // Informations Azure générales
         ACR_URL = "acrwebappdevops.azurecr.io"
         IMAGE_NAME = "webapp"
         IMAGE_TAG = "${env.BUILD_NUMBER}"
@@ -30,7 +30,6 @@ pipeline {
             steps {
                 script {
                     echo "Application des migrations SQL sur Azure..."
-                    // Utilisation de guillemets simples pour protéger le mot de passe
                     sh "mysql -h ${DB_SERVER} -u ${DB_USER} -p'${DB_PASSWORD}' ${DB_NAME} < database/migrations.sql"
                 }
             }
@@ -51,16 +50,26 @@ pipeline {
 
         stage('Deploy to AKS') {
             steps {
-                sh """
-                # Récupération du fichier kubeconfig pour AKS
-                az aks get-credentials --resource-group ${RESOURCE_GROUP} --name ${AKS_NAME} --overwrite-existing
-                
-                # Mise à jour de l'image du conteneur dans Kubernetes
-                kubectl set image deployment/webapp-deployment node-app=${ACR_URL}/${IMAGE_NAME}:${IMAGE_TAG}
-                
-                # Attente que le déploiement soit terminé et opérationnel
-                kubectl rollout status deployment/webapp-deployment
-                """
+                // Récupération des secrets du Service Principal pour la connexion az login
+                withCredentials([
+                    string(credentialsId: 'AZURE_CLIENT_ID', variable: 'AZ_ID'),
+                    string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'AZ_SECRET'),
+                    string(credentialsId: 'AZURE_TENANT_ID', variable: 'AZ_TENANT')
+                ]) {
+                    sh """
+                    # 1. Connexion automatique à Azure via le robot (Service Principal)
+                    az login --service-principal -u ${AZ_ID} -p ${AZ_SECRET} --tenant ${AZ_TENANT}
+                    
+                    # 2. Récupération du fichier kubeconfig pour AKS
+                    az aks get-credentials --resource-group ${RESOURCE_GROUP} --name ${AKS_NAME} --overwrite-existing
+                    
+                    # 3. Mise à jour de l'image du conteneur dans Kubernetes
+                    kubectl set image deployment/webapp-deployment node-app=${ACR_URL}/${IMAGE_NAME}:${IMAGE_TAG}
+                    
+                    # 4. Attente que le déploiement soit terminé et opérationnel
+                    kubectl rollout status deployment/webapp-deployment
+                    """
+                }
             }
         }
     }
